@@ -1,0 +1,6 @@
+numpy
+pandas
+statsmodels
+scikit-learn
+matplotlib
+matplotlib-venn
