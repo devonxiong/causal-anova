@@ -2,7 +2,7 @@
 
 A Python package for **Causal ANOVA explainability analysis** on user-specified DAGs (Directed Acyclic Graphs).
 
-Given a causal graph and observational data, `causal-anova` quantifies how much of the variance in an outcome is *causally explained* by each root variable — individually, jointly, and through their interactions — using a variance-decomposition approach analogous to classical ANOVA, but grounded in a structural causal model.
+Given a causal graph and observational data, `causal-anova` quantifies how much of the variance in an outcome is *causally explained* by each variable — individually, jointly, and through their interactions — using a variance-decomposition approach analogous to classical ANOVA, but grounded in a structural causal model.
 
 ## How It Works
 
