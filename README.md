@@ -83,7 +83,7 @@ The `learner` argument controls which quantile regression model is fitted at eac
 | `'neural_network'` | PyTorch feed-forward network (64→32→1) trained per quantile with the pinball loss. Smooth and nonlinear; requires `torch`. |
 | `dict` | Per-node control, e.g. `{'Charge_Degree': 'xgboost', 'Two_Year_Recid': 'neural_network'}`. Unlisted nodes default to `'linear'`. |
 
-All learners share the same prediction mechanism: predictions across the quantile grid are sorted to enforce monotonicity, then a uniform noise value is mapped to an output by linear interpolation between adjacent quantile predictions (with clamping at the grid boundaries).
+All learners share the same prediction mechanism: a uniform noise value is mapped to a concrete output value by interpolating across the fitted quantile grid.
 
 ## API Reference
 ```python
