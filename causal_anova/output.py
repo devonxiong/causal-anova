@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib_venn import venn2, venn3
 
 
-def _format_results(mean, inter, roots, compute_total, compute_pairwise):
+def _format_results(mean, se, inter, roots, compute_total, compute_pairwise):
     """
     Format explainability results into a clean pandas DataFrame.
 
@@ -17,7 +17,6 @@ def _format_results(mean, inter, roots, compute_total, compute_pairwise):
         df_out : formatted DataFrame with columns Variables, Type, Explainability (xi)
     """
     rows = []
-
     if compute_total:
         for s in sorted(mean, key=lambda x: (len(x), sorted(x))):
             label = ' , '.join(sorted(s))
@@ -25,8 +24,8 @@ def _format_results(mean, inter, roots, compute_total, compute_pairwise):
                 'Variables':           label,
                 'Type':                'Total',
                 'Explainability (xi)': f"{mean[s]:.4f}",
+                'SE':                  f"{se[s]:.4f}",
             })
-
     if compute_pairwise:
         for s in sorted(inter, key=lambda x: (len(x), sorted(x))):
             label = ' ^ '.join(sorted(s))
@@ -34,8 +33,8 @@ def _format_results(mean, inter, roots, compute_total, compute_pairwise):
                 'Variables':           label,
                 'Type':                'Interaction',
                 'Explainability (xi)': f"{inter[s]:.4f}",
+                'SE':                  '—',
             })
-
     return pd.DataFrame(rows)
 
 
@@ -49,18 +48,14 @@ def _print_results(df_out):
     print("\n" + "=" * 60)
     print("CAUSAL ANOVA RESULTS")
     print("=" * 60)
-
     total_block = df_out[df_out['Type'] == 'Total']
     inter_block = df_out[df_out['Type'] == 'Interaction']
-
     if not total_block.empty:
         print("\n-- Total Explainability --")
-        print(total_block[['Variables', 'Explainability (xi)']].to_string(index=False))
-
+        print(total_block[['Variables', 'Explainability (xi)', 'SE']].to_string(index=False))
     if not inter_block.empty:
         print("\n-- Interaction Terms (inclusion-exclusion) --")
         print(inter_block[['Variables', 'Explainability (xi)']].to_string(index=False))
-
     print("=" * 60)
 
 
@@ -91,14 +86,18 @@ def _plot_venn(mean, inter, roots):
 
     if len(roots) == 2:
         a, b = roots
-        xa, xb, xab = mean[fs({a})], mean[fs({b})], inter[fs({a, b})]
+        xa  = max(mean[fs({a})], 0)
+        xb  = max(mean[fs({b})], 0)
+        xab = max(inter[fs({a, b})], 0)  # clamp 负数为 0
+
         fig, ax = plt.subplots(figsize=(7, 5))
         v = venn2(subsets=(round(xa, 4), round(xb, 4), round(xab, 4)),
-                  set_labels=(a, b), ax=ax)
+                set_labels=(a, b), ax=ax)
         _round_labels(v)
         ax.set_title('Explainability Venn Diagram', fontsize=14)
         plt.tight_layout()
         plt.show()
+    
 
     elif len(roots) == 3:
         a, b, c = roots
