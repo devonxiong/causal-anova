@@ -1,5 +1,5 @@
 import numpy as np
-from .learners   import _LEARNER_REGISTRY, QuantileDAGModel_Linear, QuantileDAGModel_XGBoost
+from .learners import _LEARNER_REGISTRY, QuantileDAGModel_Linear, QuantileDAGModel_XGBoost, QuantileDAGModel_NeuralNetwork
 from .crn        import _crn_explainability, _interaction_terms
 from .simulator  import _build_simulator
 from .output     import _format_results, _print_results, _plot_venn
@@ -88,9 +88,14 @@ def causal_anova(
 
         print(f"\nFitting model for node: {nd}  (parents: {pa}, learner: {ln})")
 
-        m = (QuantileDAGModel_Linear(quantiles=quantiles_linear)
-             if ln == 'linear'
-             else QuantileDAGModel_XGBoost(quantiles=quantiles_xgb))
+        if ln == 'linear':
+            m = QuantileDAGModel_Linear(quantiles=quantiles_linear)
+        elif ln == 'xgboost':
+            m = QuantileDAGModel_XGBoost(quantiles=quantiles_xgb)
+        elif ln == 'neural_network':
+            m = QuantileDAGModel_NeuralNetwork(quantiles=quantiles_xgb)
+        else:
+            raise ValueError(f"Unknown learner '{ln}'.")
         m.fit(X, y)
         models[nd] = m
 
