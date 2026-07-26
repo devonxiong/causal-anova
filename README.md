@@ -68,7 +68,7 @@ The `dag` argument is a plain dictionary with four keys:
 | `edges` | `list[tuple]` | `(source, target)` pairs defining the causal structure |
 
 Requirements:
-- Every node listed under `mediators` and the outcome node must have at least one node pointing to it in `edges` (otherwise, a `ValueError` is raised).
+- Every node listed under `mediators` and the `outcome` node must have at least one node pointing to it in `edges` (otherwise, a `ValueError` is raised).
 - `data` must be a pandas DataFrame containing **all** node columns, with numeric values.
 - Nodes listed under `mediators` should be in topological order, since values are computed from left to right along the DAG.
 - Venn diagrams are only produced for 2 or 3 nodes in `roots`; total and interaction scores work for any number of nodes (note that subsets grow exponentially, so runtime increases quickly with more nodes).
