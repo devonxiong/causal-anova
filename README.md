@@ -16,7 +16,7 @@ Interaction terms are then recovered via **inclusion-exclusion**. For two nodes 
 ξ(A ∧ B) = ξ(A) + ξ(B) − ξ(A, B)
 ```
 
-A positive interaction means A and B jointly explain more of the outcome variance than the sum of their individual contributions would suggest. 
+A positive interaction means A and B jointly explain more of the outcome variance than the sum of their individual contributions would suggest.
 
 ## Installation
 ```bash
@@ -51,7 +51,7 @@ dag = {
 
 # Use 'linear' for speed, 'xgboost' or 'neural_network' for more flexibility
 results, mean, inter = causal_anova(
-    dag=dag, data=df, learner='xgboost',
+    dag=dag, data=df, learner='linear',
     compute_total=True, compute_pairwise=True,
     num_samples=10000, n_runs=8, plot_venn=True,
 )
@@ -78,7 +78,7 @@ The `learner` argument controls which quantile regression model is fitted at eac
 
 | Option | Description |
 |---|---|
-| `'linear'` | Linear quantile regression (`statsmodels.QuantReg`). Fast and interpretable; assumes linear relationships between a node and its parents. |
+| `'linear'` | Linear quantile regression (`statsmodels.QuantReg`). Fast and interpretable; assumes linear relationships in the DAG. |
 | `'xgboost'` | Gradient boosting quantile regression (`sklearn.GradientBoostingRegressor` with pinball loss). Flexible for nonlinear relationships; slower. |
 | `'neural_network'` | PyTorch feed-forward network (64→32→1) trained per quantile with the pinball loss. Smooth and nonlinear; requires `torch`. |
 | `dict` | Per-node control, e.g. `{'Charge_Degree': 'xgboost', 'Two_Year_Recid': 'neural_network'}`. Unlisted nodes default to `'linear'`. |
@@ -108,14 +108,14 @@ results, mean, inter = causal_anova(dag, data, ...)
 
 | Value | Type | Description |
 |---|---|---|
-| `results` | `pandas.DataFrame` | Formatted table with columns `Variables`, `Type` (`Total` / `Interaction`), and `Explainability (xi)` |
+| `results` | `pandas.DataFrame` | Formatted table with columns `Variables`, `Type` (`Total` / `Interaction`), `Explainability (xi)`, and `SE` |
 | `mean` | `dict{frozenset → float}` | Raw total explainability score for every subset of nodes in `roots` |
 | `inter` | `dict{frozenset → float}` | Raw interaction terms from inclusion-exclusion |
 
 A results table is also printed to the console, with the Total and Interaction sections separated.
 
 ## Interpreting the Output
-- **Total explainability ξ(S)** for a subset *S* estimates the share of outcome variability attributable to the nodes in *S*. Values near 0 mean the subset barely influences the outcome; values near 1 mean it accounts for nearly all of the variation.
+- **Total explainability ξ(S)** for a subset *S* estimates the share of outcome variability attributable to the nodes in *S*. Values near 0 indicate that the subset barely influences the outcome; values near 1 indicate that it accounts for nearly all of the variation.
 - **Interaction terms** capture synergy: how much a group of nodes explains *beyond* what their marginal scores add up to. These are non-negative in expectation, though small negative values can occur from estimation noise (they are clamped to 0 for Venn plotting).
 - **The Venn diagram** visualizes the decomposition: each region shows the corresponding total or interaction score, rounded to four decimal places.
 
@@ -131,12 +131,12 @@ A results table is also printed to the console, with the Total and Interaction s
 causal_anova/
 ├── __init__.py    # Package entry point (exports causal_anova)
 ├── main.py        # Orchestration: causal_anova() public API
-├── learners.py    # Quantile regression learners (xgboost / neural network)
-├── simulator.py   # Builds the DAG noise-propagation simulator
+├── learners.py    # Quantile regression learners (linear / xgboost / neural network)
+├── simulator.py   # Builds the DAG simulator
 ├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
 └── output.py      # Results formatting, console printing, Venn diagrams
 ```
 
 ## Example
 
-See `examples/example_compas.py` for a full walkthrough using the real COMPAS recidivism dataset, analyzing how much of two-year recidivism is causally explained by the sex, race, and age-category nodes, mediated through the prior-counts and charge-degree nodes.
+See `examples/example_compas.py` for a full walkthrough using the real COMPAS recidivism dataset, analyzing how much of two-year recidivism is causally explained by sex, race, and age category, with prior record count and charge degree as intermediate nodes in the causal graph.
