@@ -32,6 +32,9 @@ Dependencies include:
 - `matplotlib`, `matplotlib-venn` (Venn diagram output)
 
 ## Quick Start
+
+The following example is adapted from `examples/example_compas.py`, which demonstrates the package on the real COMPAS recidivism dataset.
+
 ```python
 from causal_anova import causal_anova
 
