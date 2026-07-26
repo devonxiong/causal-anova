@@ -113,7 +113,7 @@ def causal_anova(
     inter = _interaction_terms(mean, roots) if compute_pairwise else {}
 
     # ---- Format and print output ----
-    results = _format_results(mean, inter, roots, compute_total, compute_pairwise)
+    results = _format_results(mean, se, inter, roots, compute_total, compute_pairwise)
     _print_results(results)
 
     # ---- Venn Diagram ----
