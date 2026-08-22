@@ -3,18 +3,6 @@
 A Python package for **Causal ANOVA explainability analysis** on user-specified DAGs (Directed Acyclic Graphs).
 Given a causal graph and observational data, `causal-anova` quantifies how much of the variance in an outcome node is *causally explained* by each node - individually, jointly, and through their interactions - using a variance-decomposition approach analogous to classical ANOVA, but grounded in counterfactuals.
 
-## Project Structure
-
-```
-causal_anova/
-├── __init__.py    # Package entry point (exports causal_anova)
-├── main.py        # Orchestration: causal_anova() public API
-├── learners.py    # Quantile regression learners (linear / xgboost / neural network)
-├── simulator.py   # Builds the DAG simulator
-├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
-└── output.py      # Results formatting, console printing, Venn diagrams
-```
-
 ## How It Works
 The pipeline consists of two stages:
 
@@ -28,8 +16,6 @@ Interaction terms are then recovered via **inclusion-exclusion**. For two nodes 
 ξ(A ∧ B) = ξ(A) + ξ(B) − ξ(A, B)
 ```
 
-A positive interaction means A and B jointly explain more of the outcome variance than the sum of their individual contributions would suggest.
-
 ## Installation
 ```bash
 pip install -r requirements.txt
@@ -40,6 +26,18 @@ Dependencies include:
 - `scikit-learn` (gradient boosting quantile regression)
 - `torch` (neural network learner, only required if you use `'neural_network'`)
 - `matplotlib`, `matplotlib-venn` (Venn diagram output)
+
+## Project Structure
+
+```
+causal_anova/
+├── __init__.py    # Package entry point (exports causal_anova)
+├── main.py        # Orchestration: causal_anova() public API
+├── learners.py    # Quantile regression learners (linear / xgboost / neural network)
+├── simulator.py   # Builds the DAG simulator
+├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
+└── output.py      # Results formatting, console printing, Venn diagrams
+```
 
 ## Quick Start
 
@@ -97,40 +95,6 @@ The `learner` argument controls which quantile regression model is fitted at eac
 
 All learners share the same prediction mechanism: a uniform noise value is mapped to a concrete output value by interpolating across the fitted quantile grid.
 
-## API Reference
-```python
-results, mean, inter = causal_anova(dag, data, ...)
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `dag` | — | DAG specification dictionary (see above) |
-| `data` | — | pandas DataFrame with all node columns |
-| `learner` | `'linear'` | Learner name (`'linear'`, `'xgboost'`, `'neural_network'`) or per-node dict |
-| `compute_total` | `True` | Compute total explainability scores for all subsets of nodes |
-| `compute_pairwise` | `True` | Compute pairwise (and three-way) interaction terms |
-| `num_samples` | `10000` | Monte Carlo samples per CRN run |
-| `n_runs` | `8` | Independent repetitions used for averaging and standard errors |
-| `plot_venn` | `True` | Automatically plot a Venn diagram when there are 2–3 nodes in `roots` |
-| `quantiles_linear` | `arange(0.05, 1.0, 0.05)` | Quantile grid for linear learner (19 levels) |
-| `quantiles_xgb` | `arange(0.01, 1.0, 0.02)` | Quantile grid for xgboost / neural network learners (50 levels) |
-| `base_seed` | `0` | Base random seed; run *r* uses seed `base_seed + r` for reproducibility |
-
-**Returns:**
-
-| Value | Type | Description |
-|---|---|---|
-| `results` | `pandas.DataFrame` | Formatted table with columns `Variables`, `Type` (`Total` / `Interaction`), `Explainability (xi)`, and `SE` |
-| `mean` | `dict{frozenset → float}` | Raw total explainability score for every subset of nodes in `roots` |
-| `inter` | `dict{frozenset → float}` | Raw interaction terms from inclusion-exclusion |
-
-A results table is also printed to the console, with the Total and Interaction sections separated.
-
-## Interpreting the Output
-- **Total explainability ξ(S)** for a subset *S* estimates the share of outcome variability attributable to the nodes in *S*. Values near 0 indicate that the subset barely influences the outcome; values near 1 indicate that it accounts for nearly all of the variation.
-- **Interaction terms** capture synergy: how much a group of nodes explains *beyond* what their marginal scores add up to. These are non-negative in expectation, though small negative values can occur from estimation noise (they are clamped to 0 for Venn plotting).
-- **The Venn diagram** visualizes the decomposition: each region shows the corresponding total or interaction score, rounded to four decimal places.
-
 ## Tuning & Performance Tips
 
 - **Accuracy vs. speed:** increase `num_samples` and `n_runs` for tighter estimates; standard errors shrink with more runs.
@@ -187,6 +151,41 @@ Additional parameters:
 - **Network architecture**: the default network is input → 64 → 32 → 1. To change it, modify `_build_network` in `learners.py`.
 - **Learning rate**: the default Adam optimizer learning rate is `1e-3`.
 - **Quantile grid**: the neural network uses `quantiles_xgb` for its quantile grid. Pass `quantiles_xgb=np.arange(0.05, 1.0, 0.05)` for faster runs.
+
+
+## API Reference
+```python
+results, mean, inter = causal_anova(dag, data, ...)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `dag` | — | DAG specification dictionary (see above) |
+| `data` | — | pandas DataFrame with all node columns |
+| `learner` | `'linear'` | Learner name (`'linear'`, `'xgboost'`, `'neural_network'`) or per-node dict |
+| `compute_total` | `True` | Compute total explainability scores for all subsets of nodes |
+| `compute_pairwise` | `True` | Compute pairwise (and three-way) interaction terms |
+| `num_samples` | `10000` | Monte Carlo samples per CRN run |
+| `n_runs` | `8` | Independent repetitions used for averaging and standard errors |
+| `plot_venn` | `True` | Automatically plot a Venn diagram when there are 2–3 nodes in `roots` |
+| `quantiles_linear` | `arange(0.05, 1.0, 0.05)` | Quantile grid for linear learner (19 levels) |
+| `quantiles_xgb` | `arange(0.01, 1.0, 0.02)` | Quantile grid for xgboost / neural network learners (50 levels) |
+| `base_seed` | `0` | Base random seed; run *r* uses seed `base_seed + r` for reproducibility |
+
+**Returns:**
+
+| Value | Type | Description |
+|---|---|---|
+| `results` | `pandas.DataFrame` | Formatted table with columns `Variables`, `Type` (`Total` / `Interaction`), `Explainability (xi)`, and `SE` |
+| `mean` | `dict{frozenset → float}` | Raw total explainability score for every subset of nodes in `roots` |
+| `inter` | `dict{frozenset → float}` | Raw interaction terms from inclusion-exclusion |
+
+A results table is also printed to the console, with the Total and Interaction sections separated.
+
+## Interpreting the Output
+- **Total explainability ξ(S)** for a subset *S* estimates the share of outcome variability attributable to the nodes in *S*. Values near 0 indicate that the subset barely influences the outcome; values near 1 indicate that it accounts for nearly all of the variation.
+- **Interaction terms** capture synergy: how much a group of nodes explains *beyond* what their marginal scores add up to. These are non-negative in expectation, though small negative values can occur from estimation noise (they are clamped to 0 for Venn plotting).
+- **The Venn diagram** visualizes the decomposition: each region shows the corresponding total or interaction score, rounded to four decimal places.
 
 ## Example
 
