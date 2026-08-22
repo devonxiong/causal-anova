@@ -177,18 +177,15 @@ L(q) = (q-1) × (y - ŷ)  if y < ŷ  (overestimate)
 
 This asymmetry forces the network to predict the correct quantile: at q = 0.9, underestimation is penalized 9× more than overestimation, so the network learns to predict the 90th percentile.
 
-Training uses **Early Stopping** to automatically determine the optimal number of epochs. The data is split into a training set (80%) and a validation set (20%). After each epoch, the model is evaluated on the validation set. If the validation loss does not improve for `patience` consecutive epochs, training stops and the weights from the best epoch are restored. The default value of `patience = 50` was selected by inspecting the validation loss curve on the COMPAS dataset, which showed that the loss stabilized within 50 epochs of reaching its minimum.
-
-Key parameters in `learners.py`:
-
-```python
-def fit(self, X, y, val_ratio=0.2, patience=50):
-```
+Training uses **Early Stopping** to automatically determine the optimal number of epochs. The data is split into a training set (80%) and a validation set (20%). After each epoch, the model is evaluated on the validation set. If the validation loss does not improve for `patience` consecutive epochs, training stops and the weights from the best epoch are restored.
 
 - **`val_ratio`**: fraction of data held out as a validation set. Default is `0.2` (20%), following standard practice.
-- **`patience`**: number of epochs without improvement before stopping. Default is `50`. Increase this if the model stops too early; decrease it to speed up training.
+- **`patience`**: number of epochs without improvement before stopping. Default is `50`, selected by inspecting the validation loss curve on the COMPAS dataset, which showed that the loss stabilized within 50 epochs of reaching its minimum. Increase this if the model stops too early; decrease it to speed up training.
+
+Additional parameters:
+
 - **Network architecture**: the default network is input → 64 → 32 → 1. To change it, modify `_build_network` in `learners.py`.
-- **Learning rate**: the default Adam learning rate is `1e-3`.
+- **Learning rate**: the default Adam optimizer learning rate is `1e-3`.
 - **Quantile grid**: the neural network uses `quantiles_xgb` for its quantile grid. Pass `quantiles_xgb=np.arange(0.05, 1.0, 0.05)` for faster runs.
 
 ## Example
