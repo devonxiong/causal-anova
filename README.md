@@ -3,6 +3,18 @@
 A Python package for **Causal ANOVA explainability analysis** on user-specified DAGs (Directed Acyclic Graphs).
 Given a causal graph and observational data, `causal-anova` quantifies how much of the variance in an outcome node is *causally explained* by each node - individually, jointly, and through their interactions - using a variance-decomposition approach analogous to classical ANOVA, but grounded in counterfactuals.
 
+## Project Structure
+
+```
+causal_anova/
+├── __init__.py    # Package entry point (exports causal_anova)
+├── main.py        # Orchestration: causal_anova() public API
+├── learners.py    # Quantile regression learners (linear / xgboost / neural network)
+├── simulator.py   # Builds the DAG simulator
+├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
+└── output.py      # Results formatting, console printing, Venn diagrams
+```
+
 ## How It Works
 The pipeline consists of two stages:
 
@@ -27,17 +39,6 @@ Dependencies include:
 - `torch` (neural network learner, only required if you use `'neural_network'`)
 - `matplotlib`, `matplotlib-venn` (Venn diagram output)
 
-## Project Structure
-
-```
-causal_anova/
-├── __init__.py    # Package entry point (exports causal_anova)
-├── main.py        # Orchestration: causal_anova() public API
-├── learners.py    # Quantile regression learners (linear / xgboost / neural network)
-├── simulator.py   # Builds the DAG simulator
-├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
-└── output.py      # Results formatting, console printing, Venn diagrams
-```
 
 ## Quick Start
 
