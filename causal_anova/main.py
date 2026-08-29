@@ -87,16 +87,21 @@ def causal_anova(
         ln = learner_map[nd]
 
         print(f"\nFitting model for node: {nd}  (parents: {pa}, learner: {ln})")
-
+        
         if ln == 'linear':
             m = QuantileDAGModel_Linear(quantiles=quantiles_linear)
+            m.fit(X, y)
         elif ln == 'xgboost':
             m = QuantileDAGModel_XGBoost(quantiles=quantiles_xgb)
+            m.fit_with_cv(X, y)
         elif ln == 'neural_network':
             m = QuantileDAGModel_NeuralNetwork(quantiles=quantiles_xgb)
+            if nd == 'Two_Year_Recid':
+                m.fit(X, y, plot_loss=True)
+            else:
+                m.fit(X, y)
         else:
             raise ValueError(f"Unknown learner '{ln}'.")
-        m.fit(X, y)
         models[nd] = m
 
     # ---- Build simulator ----
