@@ -20,7 +20,7 @@ The pipeline consists of two stages:
 
 1. **Structural model fitting.** For every node in the DAG, a quantile regression model is fitted on the nodes that directly influence it. Instead of predicting a single conditional mean, each model learns the full conditional distribution across a grid of quantile levels. This lets us represent each node as a deterministic function of its upstream nodes plus an independent uniform noise term.
 
-2. **CRN explainability estimation.** Explainability scores are estimated with a Pick-Freeze estimator. For each subset *S* of nodes in `roots`, we compare outcomes generated from a base noise draw against outcomes where only the noise of the nodes in *S* has been resampled. Sharing the same noise draws across all subsets within a repetition reduces variance and guarantees non-negative interaction terms. Scores are averaged over multiple independent runs, and standard errors are reported across runs.
+2. **CRN explainability estimation.** Explainability scores are estimated with a Pick-Freeze estimator. For each subset *S* of nodes in `roots`, we compare outcomes generated from a base noise draw against outcomes where only the noise of the nodes in *S* has been resampled. Sharing the same noise draws across all subsets within a repetition reduces variance and keeps interaction terms non-negative in expectation. Scores are averaged over multiple independent runs, and standard errors are reported across runs.
 
 Interaction terms are then recovered via **inclusion-exclusion**. For two nodes A and B:
 
