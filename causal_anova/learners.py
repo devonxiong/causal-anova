@@ -228,7 +228,7 @@ class QuantileDAGModel_NeuralNetwork:
         train_losses  = []
         val_losses    = []
 
-        for epoch in range(1000):
+        for epoch in range(4000):
             net.train()
             optimizer.zero_grad()
             loss = pinball_loss(net(X_train), y_train)
