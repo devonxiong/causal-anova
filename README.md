@@ -91,7 +91,7 @@ The `learner` argument controls which quantile regression model is fitted at eac
 |---|---|
 | `'linear'` | Linear quantile regression (`statsmodels.QuantReg`). Fast and interpretable; assumes linear relationships in the DAG. |
 | `'xgboost'` | Gradient boosting quantile regression (`sklearn.GradientBoostingRegressor` with pinball loss). Flexible for nonlinear relationships; slower. |
-| `'neural_network'` | PyTorch feed-forward network (64→32→1) trained per quantile with the pinball loss. Smooth and nonlinear; requires `torch`. |
+| `'neural_network'` | PyTorch multi-output feed-forward network (64→32→number of quantiles) predicting all quantile levels simultaneously with the summed pinball loss. Smooth and nonlinear; requires `torch`. |
 | `dict` | Per-node control, e.g. `{'Charge_Degree': 'xgboost', 'Two_Year_Recid': 'neural_network'}`. Unlisted nodes default to `'linear'`. |
 
 All learners share the same prediction mechanism: a uniform noise value is mapped to a concrete output value by interpolating across the fitted quantile grid.
@@ -136,22 +136,26 @@ m.fit_with_cv(X, y, cv=5, param_grid={
 
 ### Tuning Neural Network
 
-The neural network learner trains one feed-forward network (64→32→1) per quantile level using the **pinball loss**, an asymmetric loss function that penalizes under- and over-prediction differently depending on the quantile level. For quantile *q*, the loss is:
+The neural network learner uses a single **multi-output architecture**: one feed-forward network (input → 64 → 32 → number of quantiles) predicts all quantile levels simultaneously. The training loss is the **pinball loss** summed across all quantile levels, so the shared hidden layers learn a smooth representation of the full conditional distribution. For quantile *q*, the loss is:
+
 ```
 L(q) = q × (y - ŷ)      if y ≥ ŷ  (underestimate)
 L(q) = (q-1) × (y - ŷ)  if y < ŷ  (overestimate)
 ```
 
-This asymmetry forces the network to predict the correct quantile: at q = 0.9, underestimation is penalized 9× more than overestimation, so the network learns to predict the 90th percentile.
 
-Training uses **Early Stopping** to automatically determine the optimal number of epochs. The data is split into a training set (80%) and a validation set (20%). After each epoch, the model is evaluated on the validation set. If the validation loss does not improve for `patience` consecutive epochs, training stops and the weights from the best epoch are restored.
+This asymmetry forces each output to predict its own quantile: at q = 0.9, underestimation is penalized 9× more than overestimation, so that output learns to predict the 90th percentile.
+
+Compared to training one network per quantile level, the multi-output design has a single random initialization (making results fully reproducible with a fixed seed), reduces quantile crossing, and trains much faster.
+
+Training uses **Early Stopping** to automatically determine the optimal number of epochs. The data is split into a training set (80%) and a validation set (20%) with a fixed random seed. After each epoch, the model is evaluated on the validation set. If the validation loss does not improve for `patience` consecutive epochs, training stops and the weights from the best epoch are restored.
 
 - **`val_ratio`**: fraction of data held out as a validation set. Default is `0.2` (20%), following standard practice.
 - **`patience`**: number of epochs without improvement before stopping. Default is `50`, selected by inspecting the validation loss curve on the COMPAS dataset, which showed that the loss stabilized within 50 epochs of reaching its minimum. Increase this if the model stops too early; decrease it to speed up training.
 
 Additional parameters:
 
-- **Network architecture**: the default network is input → 64 → 32 → 1. To change it, modify `_build_network` in `learners.py`.
+- **Network architecture**: the default network is input → 64 → 32 → number of quantiles. To change it, modify `_build_network` in `learners.py`.
 - **Learning rate**: the default Adam optimizer learning rate is `1e-3`.
 - **Quantile grid**: the neural network uses `quantiles_xgb` for its quantile grid. Pass `quantiles_xgb=np.arange(0.05, 1.0, 0.05)` for faster runs.
 
