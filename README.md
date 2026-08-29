@@ -103,6 +103,8 @@ All learners share the same prediction mechanism: a uniform noise value is mappe
 - **Quantile grid density:** a denser grid gives a finer approximation of the conditional distribution at the cost of fitting more models.
 - **Reproducibility:** all randomness derives from `base_seed`, so identical inputs produce identical results.
 
+For learner-specific tuning, see the sections below.
+
 ### Tuning XGBoost
 
 The XGBoost learner uses **5-fold cross-validation** to automatically select the optimal `n_estimators` and `max_depth` for each node. This ensures the parameter choice is data-driven and independent of the final explainability scores.
