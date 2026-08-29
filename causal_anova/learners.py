@@ -19,7 +19,7 @@ class QuantileDAGModel_Linear:
         X_with_const = np.column_stack([np.ones(len(X_arr)), X_arr])
         print(f"    Fitting {len(self.quantiles)} linear quantile models...")
         for q in self.quantiles:
-            model = QuantReg(y_arr, X_with_const).fit(q=q, max_iter=2000)
+            model = QuantReg(y_arr, X_with_const).fit(q=q, max_iter=5000)
             self.models[q] = model
         print("    Fitting complete!")
 
@@ -155,103 +155,121 @@ class QuantileDAGModel_XGBoost:
 class QuantileDAGModel_NeuralNetwork:
     """
     Neural network quantile regression model using PyTorch with pinball loss.
-    Trains one feed-forward network (input -> 64 -> 32 -> 1) per quantile level.
+    Uses a single multi-output network (input -> 64 -> 32 -> n_quantiles) that
+    predicts all quantile levels simultaneously. The training loss is the sum
+    of pinball losses across all quantile levels, so the shared hidden layers
+    learn a smooth representation of the full conditional distribution.
     Uses Early Stopping (patience=50, val_ratio=0.2) to determine the optimal
-    number of training epochs, preventing overfitting.
+    number of training epochs. A single random initialization (fixed seed)
+    makes results fully reproducible.
     """
     def __init__(self, quantiles=np.arange(0.05, 1.0, 0.05)):
         self.quantiles = np.asarray(quantiles)
-        self.models    = {}
+        self.model     = None
 
-    def _build_network(self, input_dim):
-        """Build a two-hidden-layer feed-forward network."""
+    def _build_network(self, input_dim, output_dim):
+        """Build a two-hidden-layer feed-forward network with one output per quantile."""
         import torch.nn as nn
         return nn.Sequential(
             nn.Linear(input_dim, 64), nn.ReLU(),
             nn.Linear(64, 32),        nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(32, output_dim)
         )
 
     def fit(self, X, y, val_ratio=0.2, patience=50, plot_loss=False):
         """
-        Fit one neural network per quantile level using pinball loss and Early Stopping.
+        Fit a single multi-output network for all quantile levels using the
+        summed pinball loss and Early Stopping.
 
         Args:
             X         : feature matrix
             y         : target variable
             val_ratio : fraction of data held out as validation set (default 0.2)
             patience  : epochs without improvement before stopping (default 50)
-            plot_loss : if True, plot training vs validation loss curve for the
-                        median quantile (only for the node passed to this call)
+            plot_loss : if True, plot training vs validation loss curve
         """
         import torch
         import matplotlib.pyplot as plt
+
+        torch.manual_seed(42)  # single initialization -> fully reproducible
+
         X_arr   = np.asarray(X, dtype=np.float32)
         y_arr   = np.asarray(y, dtype=np.float32)
         n       = len(X_arr)
         n_val   = int(n * val_ratio)
         n_train = n - n_val
-        idx       = np.random.permutation(n)
+
+        idx       = np.random.default_rng(42).permutation(n)
         train_idx = idx[:n_train]
         val_idx   = idx[n_train:]
+
         X_train = torch.tensor(X_arr[train_idx])
-        y_train = torch.tensor(y_arr[train_idx]).unsqueeze(1)
+        y_train = torch.tensor(y_arr[train_idx]).unsqueeze(1)   # (n_train, 1)
         X_val   = torch.tensor(X_arr[val_idx])
-        y_val   = torch.tensor(y_arr[val_idx]).unsqueeze(1)
+        y_val   = torch.tensor(y_arr[val_idx]).unsqueeze(1)     # (n_val, 1)
+
+        q_t = torch.tensor(self.quantiles, dtype=torch.float32).unsqueeze(0)  # (1, n_q)
+
         n_feat = X_arr.shape[1]
-        print(f"    Fitting {len(self.quantiles)} neural network quantile models...")
-        plot_q = self.quantiles[len(self.quantiles) // 2]
-        for q in self.quantiles:
-            net       = self._build_network(n_feat)
-            optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
-            best_val_loss = float('inf')
-            best_weights  = None
-            counter       = 0
-            train_losses  = []
-            val_losses    = []
-            for epoch in range(1000):
-                net.train()
-                optimizer.zero_grad()
-                pred = net(X_train)
-                err  = y_train - pred
-                loss = torch.mean(torch.where(err >= 0, q * err, (q - 1) * err))
-                loss.backward()
-                optimizer.step()
-                net.eval()
-                with torch.no_grad():
-                    pred_val = net(X_val)
-                    err_val  = y_val - pred_val
-                    val_loss = torch.mean(
-                        torch.where(err_val >= 0, q * err_val, (q - 1) * err_val)
-                    ).item()
-                train_losses.append(loss.item())
-                val_losses.append(val_loss)
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    best_weights  = {k: v.clone() for k, v in net.state_dict().items()}
-                    counter       = 0
-                else:
-                    counter += 1
-                if counter >= patience:
-                    print(f"      q={q:.2f}: early stopping at epoch {epoch}")
-                    break
-            if plot_loss and abs(q - plot_q) < 0.01:
-                plt.figure(figsize=(10, 5))
-                plt.plot(train_losses, label='Training Loss',   color='#1f77b4')
-                plt.plot(val_losses,   label='Validation Loss', color='#d62728')
-                plt.axvline(x=len(train_losses) - patience, color='green',
-                            linestyle='--', label=f'Early Stopping (epoch {len(train_losses)})')
-                plt.xlabel('Epoch')
-                plt.ylabel('Pinball Loss')
-                plt.title(f'Training vs Validation Loss (q={q:.2f})')
-                plt.legend()
-                plt.grid(True, linestyle='--', alpha=0.7)
-                plt.tight_layout()
-                plt.savefig(f'loss_curve_q{q:.2f}.png', dpi=300, bbox_inches='tight')
-                plt.show()
-            net.load_state_dict(best_weights)
+        net       = self._build_network(n_feat, len(self.quantiles))
+        optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+
+        print(f"    Fitting multi-output neural network "
+              f"({len(self.quantiles)} quantile outputs)...")
+
+        def pinball_loss(pred, target):
+            # pred: (n, n_q), target: (n, 1) -> broadcast to (n, n_q)
+            err = target - pred
+            return torch.mean(torch.where(err >= 0, q_t * err, (q_t - 1) * err))
+
+        best_val_loss = float('inf')
+        best_weights  = None
+        counter       = 0
+        train_losses  = []
+        val_losses    = []
+
+        for epoch in range(1000):
+            net.train()
+            optimizer.zero_grad()
+            loss = pinball_loss(net(X_train), y_train)
+            loss.backward()
+            optimizer.step()
+
             net.eval()
-            self.models[q] = net
+            with torch.no_grad():
+                val_loss = pinball_loss(net(X_val), y_val).item()
+
+            train_losses.append(loss.item())
+            val_losses.append(val_loss)
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_weights  = {k: v.clone() for k, v in net.state_dict().items()}
+                counter       = 0
+            else:
+                counter += 1
+
+            if counter >= patience:
+                break
+
+        if plot_loss:
+            plt.figure(figsize=(10, 5))
+            plt.plot(train_losses, label='Training Loss',   color='#1f77b4')
+            plt.plot(val_losses,   label='Validation Loss', color='#d62728')
+            plt.axvline(x=len(train_losses) - patience, color='green',
+                        linestyle='--', label=f'Early Stopping (epoch {len(train_losses)})')
+            plt.xlabel('Epoch')
+            plt.ylabel('Summed Pinball Loss')
+            plt.title('Training vs Validation Loss (multi-output network)')
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.tight_layout()
+            plt.savefig('loss_curve_multioutput.png', dpi=300, bbox_inches='tight')
+            plt.show()
+
+        net.load_state_dict(best_weights)
+        net.eval()
+        self.model = net
         print("    Fitting complete!")
 
     def predict_from_noise(self, X, E):
@@ -260,8 +278,8 @@ class QuantileDAGModel_NeuralNetwork:
         X_arr = np.asarray(X, dtype=np.float32)
         X_t   = torch.tensor(X_arr)
         with torch.no_grad():
-            preds = np.array([self.models[q](X_t).squeeze().numpy() for q in self.quantiles])
-        preds = np.sort(preds, axis=0)
+            preds = self.model(X_t).numpy().T   # (n_q, n)
+        preds = np.sort(preds, axis=0)          # enforce monotonicity
         q   = self.quantiles
         n   = X_arr.shape[0]
         col = np.arange(n)
@@ -275,10 +293,10 @@ class QuantileDAGModel_NeuralNetwork:
         out = np.where(E >= q[-1], preds[-1, col], out)
         return out
 
-
 # Registry mapping learner name -> class
 _LEARNER_REGISTRY = {
     'linear':         QuantileDAGModel_Linear,
     'xgboost':        QuantileDAGModel_XGBoost,
     'neural_network': QuantileDAGModel_NeuralNetwork,
 }
+
