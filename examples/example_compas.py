@@ -19,7 +19,7 @@ from causal_anova import causal_anova
 # =============================================================
 # Step 1: Load the real COMPAS dataset
 # =============================================================
-DATA_URL = "/Users/xiongyiming/Desktop/COMPASCode/compas-scores-two-years.csv"
+DATA_URL = "https://raw.githubusercontent.com/propublica/compas-analysis/master/compas-scores-two-years.csv"
 
 print("Loading COMPAS dataset...")
 raw_df = pd.read_csv(DATA_URL)
