@@ -13,6 +13,9 @@ causal_anova/
 ├── simulator.py   # Builds the DAG simulator
 ├── crn.py         # CRN Pick-Freeze estimator and inclusion-exclusion interactions
 └── output.py      # Results formatting, console printing, Venn diagrams
+examples/
+└── example_compas.py   # Full walkthrough on the COMPAS dataset
+requirements.txt
 ```
 
 ## How It Works
@@ -32,11 +35,12 @@ Interaction terms are then recovered via **inclusion-exclusion**. For two nodes 
 ```bash
 pip install -r requirements.txt
 ```
+This installs the dependencies only. The package itself is not on PyPI: place the `causal_anova/` directory in your working directory (or on your `PYTHONPATH`), then import it with `from causal_anova import causal_anova`.
 Dependencies include:
 - `numpy`, `pandas`
 - `statsmodels` (linear quantile regression)
 - `scikit-learn` (gradient boosting quantile regression)
-- `torch` (neural network learner, only required if you use `'neural_network'`)
+- `torch` (neural network learner, only required if you use `'neural_network'` - it is listed in `requirements.txt` by default, so remove that line before installing if you want to skip this large dependency)
 - `matplotlib`, `matplotlib-venn` (Venn diagram output)
 
 
@@ -90,7 +94,7 @@ The `learner` argument controls which quantile regression model is fitted at eac
 | Option | Description |
 |---|---|
 | `'linear'` | Linear quantile regression (`statsmodels.QuantReg`). Fast and interpretable; assumes linear relationships in the DAG. |
-| `'xgboost'` | Gradient boosting quantile regression (`sklearn.GradientBoostingRegressor` with pinball loss). Flexible for nonlinear relationships; slower. |
+| `'xgboost'` | Gradient boosting quantile regression (`sklearn.GradientBoostingRegressor` with pinball loss — the name follows common usage; the `xgboost` library itself is **not** required). Flexible for nonlinear relationships; slower. |
 | `'neural_network'` | PyTorch multi-output feed-forward network (64→32→number of quantiles) predicting all quantile levels simultaneously with the summed pinball loss. Smooth and nonlinear; requires `torch`. |
 | `dict` | Per-node control, e.g. `{'Charge_Degree': 'xgboost', 'Two_Year_Recid': 'neural_network'}`. Unlisted nodes default to `'linear'`. |
 
@@ -101,7 +105,7 @@ All learners share the same prediction mechanism: a uniform noise value is mappe
 - **Accuracy vs. speed:** increase `num_samples` and `n_runs` for tighter estimates; standard errors shrink with more runs.
 - **Learner choice:** `'linear'` is the fastest option and works well when relationships in the DAG are approximately linear. Use `'xgboost'` or `'neural_network'` when you expect nonlinear relationships; note that `'neural_network'` requires `torch` and is the slowest of the three.
 - **Quantile grid density:** a denser grid gives a finer approximation of the conditional distribution at the cost of fitting more models.
-- **Reproducibility:** all randomness derives from `base_seed`, so identical inputs produce identical results.
+- **Reproducibility:** CRN sampling is controlled by `base_seed` (run *r* uses seed `base_seed + r`), while model fitting uses fixed internal seeds (e.g. `random_state=42` for cross-validation splits and `torch.manual_seed(42)` for the neural network). Identical inputs therefore always produce identical results.
 
 For learner-specific tuning, see the sections below.
 
@@ -120,7 +124,7 @@ param_grid = {
 }
 ```
 
-To use a custom search grid, pass it directly to `fit_with_cv` in `learners.py`:
+Note that causal_anova() always calls fit_with_cv with the default grid; a custom search grid is not exposed through the public API. To use one, instantiate the learner manually and fit it outside of causal_anova():
 
 ```python
 m = QuantileDAGModel_XGBoost()
@@ -170,8 +174,8 @@ results, mean, inter = causal_anova(dag, data, ...)
 | `dag` | — | DAG specification dictionary (see above) |
 | `data` | — | pandas DataFrame with all node columns |
 | `learner` | `'linear'` | Learner name (`'linear'`, `'xgboost'`, `'neural_network'`) or per-node dict |
-| `compute_total` | `True` | Compute total explainability scores for all subsets of nodes |
-| `compute_pairwise` | `True` | Compute pairwise (and three-way) interaction terms |
+| `compute_total` | `True` | Compute total explainability scores for all subsets of **root** nodes |
+| `compute_pairwise` | `True` | Compute pairwise interaction terms (plus the three-way term when there are exactly 3 roots; higher-order interactions are not computed) |
 | `num_samples` | `10000` | Monte Carlo samples per CRN run |
 | `n_runs` | `8` | Independent repetitions used for averaging and standard errors |
 | `plot_venn` | `True` | Automatically plot a Venn diagram when there are 2–3 nodes in `roots` |
@@ -191,8 +195,8 @@ A results table is also printed to the console, with the Total and Interaction s
 
 ## Interpreting the Output
 - **Total explainability ξ(S)** for a subset *S* estimates the share of outcome variability attributable to the nodes in *S*. Values near 0 indicate that the subset barely influences the outcome; values near 1 indicate that it accounts for nearly all of the variation.
-- **Interaction terms** capture synergy: how much a group of nodes explains *beyond* what their marginal scores add up to. These are non-negative in expectation, though small negative values can occur from estimation noise (they are clamped to 0 for Venn plotting).
-- **The Venn diagram** visualizes the decomposition: each region shows the corresponding total or interaction score, rounded to four decimal places.
+- **Interaction terms** capture synergy: how much a group of nodes explains *beyond* what their marginal scores add up to. These are non-negative in expectation, though small negative values can occur from estimation noise (they are clamped to 0 for Venn plotting). Interaction terms are derived deterministically from the total scores via inclusion-exclusion, so no standard error is reported for them (shown as `—` in the table).
+- **The Venn diagram** visualizes the decomposition: each region shows the corresponding total or interaction score, rounded to four decimal places. Note that the circles are labeled with the raw scores rather than mutually exclusive areas - the region for node A displays the full ξ(A), not ξ(A) minus its interactions - so the numbers should be read as annotations, not as additive areas in the standard Venn sense.
 
 ## Example
 
