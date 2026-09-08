@@ -88,7 +88,7 @@ def _plot_venn(mean, inter, roots):
         a, b = roots
         xa  = max(mean[fs({a})], 0)
         xb  = max(mean[fs({b})], 0)
-        xab = max(inter[fs({a, b})], 0)  # clamp 负数为 0
+        xab = max(inter[fs({a, b})], 0) 
 
         fig, ax = plt.subplots(figsize=(7, 5))
         v = venn2(subsets=(round(xa, 4), round(xb, 4), round(xab, 4)),
